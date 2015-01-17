@@ -31,14 +31,14 @@ byte beatPatterns[NUM_BEAT_PATTERNS][BEAT_PATTERN_SIZE] = {
 /**
  * Pick a random "primary" color - one of the 8 key ones.
  */
-uint32_t randomPrimary(LPD8806 strip) {
-  byte r = random(10)>4 ? 127 : 0;
-  byte g = random(10)>4 ? 127 : 0;
-  byte b = random(10)>4 ? 127 : 0;
-  
-  // If black, try again
-  if(r == 0 && g == 0 && b == 0) return randomPrimary(strip);
-  else return strip.Color(r, g, b);
+CRGB randomPrimary() {
+  if(currentMode == mode_random){
+    return CHSV(random(0,255), 255, 255);
+  }else if (currentMode == mode_white){
+    return CRGB::White;
+  }else{
+    return CHSV(currentHue, 255, 255);
+  }
 }
 
 /**
@@ -46,28 +46,25 @@ uint32_t randomPrimary(LPD8806 strip) {
  */
 class BeamAtATime {
 private:
-  LPD8806 strip;
-
   byte beatPattern;
   byte currentPattern;
-  uint32_t col[4];
+  CRGB col[4];
   byte pattern[4];
   
   byte currentBeam;
   byte displayed;
   
   void randomisePattern();
-  void fillCurrentBeams(int start, int finish, uint32_t col);
-  void fillBeam(int beam, int start, int finish, uint32_t col);
+  void fillCurrentBeams(int start, int finish, CRGB col);
+  void fillBeam(int beam, int start, int finish, CRGB col);
   
 public:  
-  BeamAtATime(LPD8806 strip);
+  BeamAtATime();
   void onBeat(int beat);
   void onTick(unsigned long tick, int beatPermil);
 };
 
-BeamAtATime::BeamAtATime(LPD8806 strip) {
-  this->strip = strip;
+BeamAtATime::BeamAtATime() {
   this->currentBeam = -1;
   this->displayed = true;
   
@@ -88,12 +85,12 @@ void BeamAtATime::randomisePattern() {
   int i;
   for(i=0;i<4;i++) {
     this->pattern[i] = random(NUM_PATTERNS);
-    this->col[i] = randomPrimary(this->strip);
+    this->col[i] = randomPrimary();
   }
 }
 
 void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
-  clearStrip();
+  FastLED.clear();
   
   // Simple curve for slowed growth
   beatPermil = 1000-beatPermil;
@@ -101,8 +98,8 @@ void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
   beatPermil = 1000-beatPermil;
 
   // Quick hack because the simple curve tends to stall on the last item
-  int length = 33 * beatPermil / 1000;
-  if(length > 32) length = 32;
+  int length = (int)((long)(BEAM_HEIGHT+1) * beatPermil / 1000);
+  if(length > BEAM_HEIGHT) length = BEAM_HEIGHT;
 
   switch(this->pattern[this->currentPattern]) {
   case PATTERN_ON:
@@ -110,7 +107,7 @@ void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
     break;
     
   case PATTERN_WIPE_UP:
-    this->fillCurrentBeams(32-length, BEAM_HEIGHT, this->col[this->currentPattern]);
+    this->fillCurrentBeams(BEAM_HEIGHT-length, BEAM_HEIGHT, this->col[this->currentPattern]);
     break;
     
   case PATTERN_WIPE_DOWN:
@@ -146,25 +143,26 @@ void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
     break;
   }
   
-  this->strip.show();
+  
+  // this->strip.show();
 }
 
 /**
  * Fill a region of colour on the current beam
  */
-void BeamAtATime::fillCurrentBeams(int start, int finish, uint32_t col) {
+void BeamAtATime::fillCurrentBeams(int start, int finish, CRGB col) {
   byte bitMask = 1;
   int beam = 0;
-  while(beam < 4) {
+  while(beam < BEAM_COUNT) {
     if(this->currentBeam & bitMask) this->fillBeam(beam, start, finish, col);
     beam++;
     bitMask *= 2;
   }
 }
-void BeamAtATime::fillBeam(int currentBeam, int start, int finish, uint32_t col) {
+void BeamAtATime::fillBeam(int currentBeam, int start, int finish, CRGB col) {
   int i;
   for(i = start; i < finish; i++) {
-    this-> strip.setPixelColor(i + currentBeam * BEAM_HEIGHT, col);
+    leds[i + currentBeam * BEAM_HEIGHT] = col;
   }
 }
 

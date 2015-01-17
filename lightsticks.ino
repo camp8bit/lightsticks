@@ -1,33 +1,13 @@
-// How many lights on each stick
-const int BEAM_HEIGHT = 32;
-// How many light sticks
-const int BEAM_COUNT = 4;
-// Frame length in ms
-const int FRAME_LENGTH = 20;
+#include "setup.h"
+#include <FastLED.h>
 
-// Pin identifiers
-const int BUTTON_A = 6;
-const int BUTTON_B = 5;
+enum lightMode {
+  mode_random,
+  mode_white,
+  mode_primary
+};
 
-const int STATUS_R = 2;
-const int STATUS_G = 3;
-const int STATUS_B = 4;
-
-// Colours
-const int BLACK = 0;
-const int RED = 1;
-const int GREEN = 2;
-const int GOLD = 3;
-const int BLUE = 4;
-const int PINK = 5;
-const int CYAN = 6;
-const int WHITE = 7;
-
-// Operating modes
-const byte MODE_LIGHT = 0;
-const byte MODE_HEAVY = 1;
-
-byte currentMode = 0;
+lightMode currentMode = mode_white;
 
 // Time the 'tap the beat' button was last pressed
 unsigned long timeLastMarkTimer = 0;
@@ -42,61 +22,97 @@ int beatNumberLastClick = 0;
 // Gap between beats - measure of tempo. measured in 10x milliseconds, for more accuracy
 int beatGap10X = 8000; //-1;
 
-#include "LPD8806.h"
+String inputString = "";         // a string to hold incoming data
+boolean stringComplete = false;  // whether the string is complete
+
+boolean x1, x2;
+
+byte currentHue;
+byte currentPattern;
+
+// #include "LPD8806.h"
 #include "SPI.h"
 #include "patterns.h"
 
-LPD8806 strip = LPD8806(BEAM_HEIGHT * BEAM_COUNT);
+// LPD8806 strip = LPD8806(BEAM_HEIGHT * BEAM_COUNT);
 
-BeamAtATime rule = BeamAtATime(strip);
+BeamAtATime rule = BeamAtATime();
+
+unsigned long tick, lastTick, oldTick;
 
 void setup() {
-  // Set up controller UI elements
-  pinMode(BUTTON_A, INPUT);
-  pinMode(BUTTON_B, INPUT);
-  
-  pinMode(STATUS_R, OUTPUT);
-  pinMode(STATUS_G, OUTPUT);
-  pinMode(STATUS_B, OUTPUT);
-  
-  digitalWrite(STATUS_R, HIGH);
-  digitalWrite(STATUS_G, HIGH);
-  digitalWrite(STATUS_B, HIGH);
+  // For recieving midi signals
+  Serial.begin(57600);
+  Serial.println("start");
 
-  // Set up light strip
-  strip.begin();
-  strip.show();
+  FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+  FastLED.setBrightness(200);
 
-  // For debugging
-  Serial.begin(9600);
+  lastTick = millis();
+  timeLastMarkTimer = millis();
 }
 
 /**
  * Main loop - doesn't do much except detect ticks
  */
-void loop() {
-  unsigned long tick, lastTick = millis();
-  
-  while(true) {
-    tick = millis();
-    checkButtons(tick);
 
-    // 20 frames / sec
-    if((tick - lastTick) >= FRAME_LENGTH) {
-      handleTick(tick);
-      
-      lastTick = tick;
+void setHue(int x){
+  currentHue = x * 7;
+}
+
+void setMode(int x){
+  if(x==0){
+    currentMode = mode_random;
+  }else if (x==1){
+    currentMode == mode_white;
+  }else{
+    currentMode = mode_primary;
+  }
+}
+
+void loop() {
+  oldTick = tick;
+  tick = millis();
+
+  if (stringComplete) {
+    Serial.println(inputString);
+    if(inputString == "B"){
+      markTimer(tick);
+    }else{
+      char c = inputString[0];
+      setHue(int(c));
+
+      c = inputString[1];
+      setMode(int(c));
     }
+    inputString = "";
+    stringComplete = false;
+  }
+
+  // 20 frames / sec
+  if((tick - lastTick) >= FRAME_LENGTH) {
+    int i;
+    for(i=0;i<NUM_LEDS;i++){
+      leds[i] = (beatNumber % 2) ? CRGB::Red : CRGB::Black; // : CRGB::Black;
+    }
+  
+    handleTick(tick);
+
+    lastTick = tick;
+  }
+  
+  // Every millisecond
+  if(oldTick != tick) {
+    FastLED.show();
   }
 }
 
 /**
  * What happens on a single tick - dispatch to all subsystems
   */
-void handleTick(unsigned long tick) {
-  // Status lights
-  handleStatusTick();
 
+void handleTick(unsigned long tick) {
+//  Serial.print('x');
   // Beat tracking
   checkBeat(tick);
   
@@ -112,38 +128,6 @@ int buttonB =  0;
 // Time when the button last changed value - used to detect flickering
 unsigned long timeButtonALastChange = 0;
 unsigned long timeButtonBLastChange = 0;
-
-void checkButtons(unsigned long tick) {
-  int newButtonA = digitalRead(BUTTON_A);
-  int newButtonB = digitalRead(BUTTON_B);
-
-  // Click button A  
-  if(buttonA != newButtonA) {
-    // Avoid "flickering" due to button hardware imperfections
-    if((tick - timeButtonALastChange) > 50) {    
-      if(newButtonA) {
-//        Serial.println('A');
-        markTimer(tick);
-      }
-    }
-    timeButtonALastChange = tick;
-  }
-
-  // Click button B
-  if(buttonB != newButtonB) {
-    // Avoid "flickering" due to button hardware imperfections
-    if((tick - timeButtonBLastChange) > 50) {    
-      if(newButtonB) {
-//        Serial.println('B');
-          toggleMode();
-      }
-    }
-    timeButtonBLastChange = tick;
-  }
-
-  buttonA = newButtonA;
-  buttonB = newButtonB;
-}
 
 /////////////////////////////////////////////////////////////////
 // TAP-THE-BEAT MANAGEMENT
@@ -171,10 +155,6 @@ void markTimer(unsigned long time) {
     // Recalcuate timeGap over entire cycle - more accurate
     beatNumber = beatNumberLastClick;
     beatGap10X = 10*(time-timeLastBarStarted) / (beatNumber+1);
-
-    //Serial.print(beatNumber);
-    //Serial.print(',');
-    //Serial.print(beatGap10X);
   }
 
   doBeat();
@@ -201,14 +181,18 @@ void doBeat() {
   if(beatNumber == 0) {
     setStatusColour(BLUE, 50);
     timeLastBarStarted = millis();
+
+    // currentHue = CRGB::Blue;
     
   // Start of bar
   } else if(beatNumber % 4 == 0) {
     setStatusColour(GOLD, 50);
 
+    // currentHue = CRGB::Yellow;
+
   // Regular beat
   } else {
-    setStatusColour(currentMode == MODE_HEAVY ? RED : GREEN, 50);
+    // currentHue = MODE_HEAVY ? CRGB::White : CRGB::Green;
   }
   
   // Trigger event to currently loaded rule
@@ -249,9 +233,6 @@ void setStatusColour(int colour) {
   digitalWrite(STATUS_B, (colour & 4) ? LOW : HIGH);
 }
 
-void toggleMode() {
-  currentMode = 1 - currentMode;
-}
   
 
 /////////////////////////////////////////////////////////////////
@@ -259,15 +240,41 @@ void toggleMode() {
 
 void clearStrip() {
   int i;
-  for(i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, 0); // Erase pixel, but don't refresh!
-  }
+   for(i=0; i<NUM_LEDS; i++) {
+     leds[i] = CRGB::Black;
+   }
 }
 
 void allOn(byte r, byte g, byte b) {
   int i;
-  int col = strip.Color(r, g, b);
-  for(i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, col); // Erase pixel, but don't refresh!
+  // int col = strip.Color(r, g, b);
+   for(i=0; i<NUM_LEDS; i++) {
+     leds[i] = CRGB::White;
+   }
+}
+
+/* Serial input */
+
+/*
+  SerialEvent occurs whenever a new data comes in the
+ hardware serial RX.  This routine is run between each
+ time loop() runs, so using delay inside loop can delay
+ response.  Multiple bytes of data may be available.
+ */
+void serialEvent() {
+  while (Serial.available()) {
+    // get the new byte:
+    char inChar = (char)Serial.read(); 
+    // add it to the inputString:
+    if(inChar != '\n'){
+      inputString += inChar;
+    }
+    
+    // if the incoming character is a newline, set a flag
+    // so the main loop can do something about it:
+    if (inChar == '\n') {
+      stringComplete = true;
+    } 
   }
 }
+
