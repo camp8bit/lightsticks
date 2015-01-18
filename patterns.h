@@ -140,9 +140,9 @@ void Fire2012()
       for( int j = 0; j < BEAM_HEIGHT; j++) {
 //        leds[j + i * BEAM_HEIGHT] = HeatColor(heat[j]);
         if(i%2==0){
-          leds[j + i * BEAM_HEIGHT] = ColorFromPalette(currentPalette, heat[j]);
-        }else{
           leds[(BEAM_HEIGHT-j) + i * BEAM_HEIGHT] = ColorFromPalette(currentPalette, heat[j]);
+        }else{
+          leds[j + i * BEAM_HEIGHT] = ColorFromPalette(currentPalette, heat[j]);
         }
         
 //        if(globalCurrentPattern==6){
