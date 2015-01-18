@@ -166,6 +166,13 @@ void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
   int length = (int)((long)(BEAM_HEIGHT+1) * beatPermil / 1000);
   if(length > BEAM_HEIGHT) length = BEAM_HEIGHT;
 
+  if(solidMode){
+    for(int z=0;z<BEAM_COUNT;z++){
+      this->fillBeam(z, 0, BEAM_HEIGHT, randomPrimary());
+    }
+    return;
+  }
+
   if(currentMode == mode_fire){
     Fire2012();
     return;
