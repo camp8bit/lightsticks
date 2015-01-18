@@ -4,10 +4,12 @@
 enum lightMode {
   mode_random,
   mode_white,
-  mode_primary
+  mode_primary,
+  mode_fire
 };
 
 lightMode currentMode = mode_white;
+int globalCurrentPattern = -1;
 
 // Time the 'tap the beat' button was last pressed
 unsigned long timeLastMarkTimer = 0;
@@ -52,25 +54,52 @@ void setup() {
   timeLastMarkTimer = millis();
 }
 
-/**
- * Main loop - doesn't do much except detect ticks
- */
-
-void setHue(int x){
-  currentHue = constrain(x * 7, 0, 255);
+// Rows 2 to 7 set the Hue
+void setHue(int y){
+  currentHue = constrain((y - 2) * (255 / 6), 0, 255);
 }
 
-void setMode(int x){
-  if(x==0){
-    currentMode = mode_random;
-  }else if (x==1){
-    currentMode == mode_white;
+// Patterns are columns 0 to 7. Column 0 is set to -1 to indicate use a random pattern.
+
+void setPattern(int x){
+  if(x == 0){
+    x = -1;
+  }
+  
+  rule.randomisePattern();
+  
+  globalCurrentPattern = constrain(x, -1, 8);
+}
+
+// Row 0 is 'all random', or special functions (fire)
+// Row 1 is different patterns on color wihte
+// Row 2 to 7 is different patterns on specified hue
+void setMode(int x, int y){
+  Serial.println("setMode");
+  Serial.println(x);
+  Serial.println(y);
+
+  if(y==0){
+    if(x>2){
+      currentMode = mode_fire;
+      setPattern(x);
+    }else{
+      currentMode = mode_random;
+      setPattern(0);
+    }
+  }else if (y==1){
+    currentMode = mode_white;
+    setPattern(x);
   }else{
     currentMode = mode_primary;
+    setHue(y);
+    setPattern(x);
   }
 }
 
 void loop() {
+  random16_add_entropy( random());
+
   oldTick = tick;
   tick = millis();
 
@@ -80,11 +109,9 @@ void loop() {
     if(inputString == "B"){
       markTimer(tick);
     }else{
-      char c = inputString[0];
-      setHue(c - '0');
-
-      c = inputString[1];
-      setMode(c - '0');
+      char x = inputString[0];
+      char y = inputString[1];
+      setMode(x - '0', y - '0');
     }
     
     inputString = "";

@@ -54,12 +54,12 @@ private:
   byte currentBeam;
   byte displayed;
   
-  void randomisePattern();
   void fillCurrentBeams(int start, int finish, CRGB col);
   void fillBeam(int beam, int start, int finish, CRGB col);
   
 public:  
   BeamAtATime();
+  void randomisePattern();
   void onBeat(int beat);
   void onTick(unsigned long tick, int beatPermil);
 };
@@ -83,15 +83,74 @@ void BeamAtATime::randomisePattern() {
   this->beatPattern = random(NUM_BEAT_PATTERNS);
 
   int i;
-  for(i=0;i<4;i++) {
+  for(i=0;i<BEAM_COUNT;i++) {
     this->pattern[i] = random(NUM_PATTERNS);
     this->col[i] = randomPrimary();
   }
 }
 
 // For fire simulation
-#define COOLING  55
+#define COOLING 55
 #define SPARKING 120
+
+CRGBPalette16 currentPalette;
+
+byte heat[BEAM_HEIGHT];
+
+void Fire2012()
+{
+// Array of temperature readings at each simulation cell
+
+  currentPalette = HeatColors_p;
+  
+  if(globalCurrentPattern == 6){
+    currentPalette = RainbowColors_p;
+  }
+  
+  if(globalCurrentPattern == 5){
+    currentPalette = OceanColors_p;
+  }
+  
+  if(globalCurrentPattern == 4){
+    currentPalette = ForestColors_p;
+  }
+  
+  if(globalCurrentPattern == 3){
+    currentPalette = PartyColors_p;
+  }
+  
+  // Step 1.  Cool down every cell a little
+    for( int i = 0; i < BEAM_HEIGHT; i++) {
+      heat[i] = qsub8( heat[i],  random8(0, ((COOLING * 10) / BEAM_HEIGHT) + 2));
+    }
+  
+    // Step 2.  Heat from each cell drifts 'up' and diffuses a little
+    for( int k= BEAM_HEIGHT - 1; k >= 2; k--) {
+      heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2] ) / 3;
+    }
+    
+    // Step 3.  Randomly ignite new 'sparks' of heat near the bottom
+    if( random8() < SPARKING ) {
+      int y = random8(7);
+      heat[y] = qadd8( heat[y], random8(160,255) );
+    }
+
+    // Step 4.  Map from heat cells to LED colors
+    for(int i=0; i < BEAM_COUNT; i++){
+      for( int j = 0; j < BEAM_HEIGHT; j++) {
+//        leds[j + i * BEAM_HEIGHT] = HeatColor(heat[j]);
+        if(i%2==0){
+          leds[j + i * BEAM_HEIGHT] = ColorFromPalette(currentPalette, heat[j]);
+        }else{
+          leds[(BEAM_HEIGHT-j) + i * BEAM_HEIGHT] = ColorFromPalette(currentPalette, heat[j]);
+        }
+        
+//        if(globalCurrentPattern==6){
+//        }else if(globalCurrentPattern==7){
+//        }
+      }
+    }
+}
 
 void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
   FastLED.clear();
@@ -105,7 +164,18 @@ void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
   int length = (int)((long)(BEAM_HEIGHT+1) * beatPermil / 1000);
   if(length > BEAM_HEIGHT) length = BEAM_HEIGHT;
 
-  switch(this->pattern[this->currentPattern]) {
+  if(currentMode == mode_fire){
+    Fire2012();
+    return;
+  }
+  
+  byte pattern = this->pattern[this->currentPattern];
+  
+  if(globalCurrentPattern > 0){
+    pattern = globalCurrentPattern;
+  }
+
+  switch(pattern) {
   case PATTERN_ON:
     this->fillCurrentBeams(0, BEAM_HEIGHT, this->col[this->currentPattern]);
     break;
@@ -166,12 +236,16 @@ void BeamAtATime::fillCurrentBeams(int start, int finish, CRGB col) {
 void BeamAtATime::fillBeam(int currentBeam, int start, int finish, CRGB col) {
   int i;
   
-  currentBeam = clamp(currentBeam, 0, BEAM_COUNT);
-  start = clamp(start, 0, BEAM_HEIGHT);
-  finish = clamp(finish, 0, BEAM_HEIGHT);
+  currentBeam = constrain(currentBeam, 0, BEAM_COUNT);
+  start = constrain(start, 0, BEAM_HEIGHT);
+  finish = constrain(finish, 0, BEAM_HEIGHT);
   
   for(i = start; i < finish; i++) {
-    leds[i + currentBeam * BEAM_HEIGHT] = col;
+    if(currentBeam % 2 == 0){
+      leds[i + currentBeam * BEAM_HEIGHT] = (currentMode == mode_white) ? CRGB::White : col;
+    }else{
+      leds[(BEAM_HEIGHT - i) + currentBeam * BEAM_HEIGHT] = (currentMode == mode_white) ? CRGB::White : col;
+    }
   }
 }
 
