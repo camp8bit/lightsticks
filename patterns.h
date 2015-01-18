@@ -32,7 +32,9 @@ byte beatPatterns[NUM_BEAT_PATTERNS][BEAT_PATTERN_SIZE] = {
  * Pick a random "primary" color - one of the 8 key ones.
  */
 CRGB randomPrimary() {
-  if(currentMode == mode_random){
+  if(currentMode == mode_black){
+    return CRGB::Black;
+  }else if(currentMode == mode_random){
     return CHSV(random(0,255), 255, 255);
   }else if (currentMode == mode_white){
     return CRGB::White;

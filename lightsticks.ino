@@ -5,7 +5,8 @@ enum lightMode {
   mode_random,
   mode_white,
   mode_primary,
-  mode_fire
+  mode_fire,
+  mode_black
 };
 
 lightMode currentMode = mode_white;
@@ -80,7 +81,10 @@ void setMode(int x, int y){
   Serial.println(y);
 
   if(y==0){
-    if(x>2){
+    if(x==0){
+      currentMode = mode_black;
+      setPattern(0);
+    }else if(x>2){
       currentMode = mode_fire;
       setPattern(x);
     }else{
