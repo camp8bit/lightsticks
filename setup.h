@@ -3,7 +3,7 @@
 // How many lights on each stick
 const int BEAM_HEIGHT = 47;
 // How many light sticks
-const int BEAM_COUNT = 2;
+const int BEAM_COUNT = 4;
 
 // How many leds in your strip?
 #define NUM_LEDS BEAM_HEIGHT * BEAM_COUNT

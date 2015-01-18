@@ -211,9 +211,20 @@ void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
 
   
   case PATTERN_STROBE:
+  
+  
     this->displayed--;
-    if(this->displayed == 0) this->fillCurrentBeams(0, BEAM_HEIGHT, this->col[this->currentPattern]);
+    if(this->displayed == 0){
+      if(currentMode == mode_white){
+         for(int j=0;j<BEAM_COUNT;j++){
+           this->fillBeam(j,0,BEAM_HEIGHT, CRGB::White);
+         } 
+      }else{
+        this->fillCurrentBeams(0, BEAM_HEIGHT, this->col[this->currentPattern]);
+      }
+    }
     if(!this->displayed) this->displayed = 5;
+    
     break;
   }
   
