@@ -82,7 +82,7 @@ void setMode(int x, int y){
   Serial.println(y);
 
   if(y==0){
-    if(x==0){
+    if(x==1){
       currentMode = mode_black;
       setPattern(0);
     }else if(x>2){
