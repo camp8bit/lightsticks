@@ -89,6 +89,10 @@ void BeamAtATime::randomisePattern() {
   }
 }
 
+// For fire simulation
+#define COOLING  55
+#define SPARKING 120
+
 void BeamAtATime::onTick(unsigned long tick, int beatPermil) {
   FastLED.clear();
   
@@ -161,6 +165,11 @@ void BeamAtATime::fillCurrentBeams(int start, int finish, CRGB col) {
 }
 void BeamAtATime::fillBeam(int currentBeam, int start, int finish, CRGB col) {
   int i;
+  
+  currentBeam = clamp(currentBeam, 0, BEAM_COUNT);
+  start = clamp(start, 0, BEAM_HEIGHT);
+  finish = clamp(finish, 0, BEAM_HEIGHT);
+  
   for(i = start; i < finish; i++) {
     leds[i + currentBeam * BEAM_HEIGHT] = col;
   }

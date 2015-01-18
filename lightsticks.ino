@@ -57,7 +57,7 @@ void setup() {
  */
 
 void setHue(int x){
-  currentHue = x * 7;
+  currentHue = constrain(x * 7, 0, 255);
 }
 
 void setMode(int x){
@@ -76,28 +76,28 @@ void loop() {
 
   if (stringComplete) {
     Serial.println(inputString);
+    
     if(inputString == "B"){
       markTimer(tick);
     }else{
       char c = inputString[0];
-      setHue(int(c));
+      setHue(c - '0');
 
       c = inputString[1];
-      setMode(int(c));
+      setMode(c - '0');
     }
+    
     inputString = "";
     stringComplete = false;
   }
 
   // 20 frames / sec
   if((tick - lastTick) >= FRAME_LENGTH) {
-    int i;
-    for(i=0;i<NUM_LEDS;i++){
-      leds[i] = (beatNumber % 2) ? CRGB::Red : CRGB::Black; // : CRGB::Black;
-    }
+//    for(i=0;i<NUM_LEDS;i++){
+//      leds[i] = (beatNumber % 2) ? CRGB::Red : CRGB::Black; // : CRGB::Black;
+//    }
   
     handleTick(tick);
-
     lastTick = tick;
   }
   
