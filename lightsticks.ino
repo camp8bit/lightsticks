@@ -6,12 +6,12 @@ enum lightMode {
   mode_white,
   mode_primary,
   mode_fire,
+  mode_solid,
   mode_black
 };
 
 lightMode currentMode = mode_white;
 int globalCurrentPattern = -1;
-boolean solidMode = false;
 
 // Time the 'tap the beat' button was last pressed
 unsigned long timeLastMarkTimer = 0;
@@ -95,17 +95,20 @@ void setMode(int x, int y){
   }else if (y==1){
     currentMode = mode_white;
     setPattern(x);
+
+    if(x==1){
+      currentMode = mode_solid;
+    }
   }else{
     currentMode = mode_primary;
     setHue(y);
     setPattern(x);
+
+    if(x==1){
+      currentMode = mode_solid;
+    }
   }
-  
-  solidMode = false;
-  
-  if(x==1){
-    solidMode = true;
-  }
+    
 }
 
 void loop() {
